@@ -1,0 +1,95 @@
+#!/usr/bin/env python
+
+import os
+import re
+import subprocess
+import sys
+
+defaultMaximumLineLength = 80
+
+modified = re.compile('^(?:M|A)(\s+)(?P<name>.*)')
+diffHeader = re.compile('^@@[^\+]+\+(?P<line>\d+),(?P<offset>\d+)\s+@@')
+
+def isInt(s):
+	try: 
+		int(s)
+		return True
+	except ValueError:
+		return False
+
+def lineIsTooLong(line, maxLength = 80):
+	"Check line's length against maximum"
+	return len(line) > maxLength
+	
+def getBashOutput(args):
+	"Get bash output as an array of strings"
+	p = subprocess.Popen(args, stdout=subprocess.PIPE)
+	out, err = p.communicate()
+	return out.splitlines() if err == None else err.splitlines()
+	
+def getMaxLineLength():
+	"Get maximum line length from configuration"
+	bashOutput = getBashOutput(['git', 'config', 'pre-commit.max-line-length'])
+	if (len(bashOutput) != 0) and (isInt(bashOutput[0]) and (bashOutput[0] > 0)):
+		return int(bashOutput[0])
+	else:
+		return defaultMaximumLineLength
+		
+def getModifiedFiles(all_files):
+	"Get modified and added files list"
+	files = []
+	if all_files:
+		for root, dirs, file_names in os.walk('.'):
+			for file_name in file_names:
+				files.append(os.path.join(root, file_name))
+	else:
+		for line in getBashOutput(['git', 'status', '--porcelain']):
+			match = modified.match(line)
+			if match:
+				files.append(match.group('name'))
+	return files
+	
+def checkModifiedLines(file, maxLineLength):
+	"Check modified lines in the specified file and throw error if one of them is too long"
+	lines = getBashOutput(['git', 'diff', '--cached', file])
+	diffLine = 0
+	for line in lines:
+			if diffHeader.match(line):
+				diffLine = int(diffHeader.match(line).group('line'))
+			elif (line[0] == ' ') and (diffLine != 0):
+				diffLine += 1
+			elif (line[0] == '+') and (diffLine != 0): 
+				diffLine += 1
+				if lineIsTooLong(line[1:], maxLineLength):
+					error = file + ':' + str(diffLine-1) + ': Line has length ' + str(len(line) - 1) + ' but ' + str(maxLineLength) + ' is allowed [max_line_length]'
+					print(error)
+					print(line[1:maxLineLength+1] + '[...]')
+					sys.exit(1)
+					
+def checkLinesLength(all_files):
+	# Should we check length at all?
+	if not 'false' in getBashOutput(['git', 'config', 'pre-commit.max-line-length.enabled']):
+		# OK, let's get the max length of lines
+		maxLineLength = getMaxLineLength()
+		
+		# In each of the modified files we look for added lines
+		for file in getModifiedFiles(all_files):
+			checkModifiedLines(file, maxLineLength)
+								
+	return 0
+
+
+def main(all_files):
+	result = 0
+	
+	#result += CheckLinesLength()
+	checkLinesLength(all_files)
+	
+	sys.exit(result)
+
+
+if __name__ == '__main__':
+	all_files = False
+	if len(sys.argv) > 1 and sys.argv[1] == '--all-files':
+		all_files = True
+	main(all_files)
