@@ -4,6 +4,7 @@ import os
 import re
 import subprocess
 import sys
+import unittest
 
 defaultMaximumLineLength = 80
 
@@ -93,3 +94,18 @@ if __name__ == '__main__':
 	if len(sys.argv) > 1 and sys.argv[1] == '--all-files':
 		all_files = True
 	main(all_files)
+	
+	
+class UnitTests(unittest.TestCase):
+	def testLineLength(self):
+		self.assertTrue(lineIsTooLong('a'*10,10))
+		self.assertFalse(lineIsTooLong('a'*11,10))
+		self.assertTrue(lineIsTooLong('a'*80))
+		self.assertFalse(lineIsTooLong('a'*81))
+		
+    def testIfInt(self):
+		self.assertTrue(isInt(50))
+		self.assertFalse(isInt('ss'))
+		
+
+	

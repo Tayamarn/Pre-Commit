@@ -23,16 +23,20 @@ def getDestinationPathInteractive():
 def getDestinationPathWin():
     root = Tkinter.Tk()
     root.withdraw()
-    return tkFileDialog.askdirectory(parent=root,initialdir="/",title='Please select a directory')
+    path = tkFileDialog.askdirectory(parent=root,initialdir="/",title='Please select a directory')
+    if path == '':
+        tkMessageBox.showerror('Error', "Installation was cancelled.")
+        sys.exit(1)
+    return path
          
 def checkIfPathValid(path):
     if path[-1] in ['/','\\']:
         path = path[:-1]
         
-    # Get path to /.git/ folder
+    # Get path to /.git folder
     if path[-10:] in ['.git\\hooks','.git/hooks']:
         return path[:-6]
-    elif (path[-4:] == '.git'): # and (os.path.isdir(path + '/hooks')):
+    elif (path[-4:] == '.git'):
         return path
     elif (os.path.isdir(path + '/.git')):
         return path + '/.git'
@@ -121,8 +125,10 @@ else:
     
 
 class UnitTests(unittest.TestCase):
-    def test(self):
-        pass
+    def testIfPathValid(self):
+        self.assertEqual(checkIfPathValid('C:/Git/.git/hooks/'), 'C:/Git/.git')
+        self.assertEqual(checkIfPathValid('C:/Git/.git/'), 'C:/Git/.git')
+
     
     
     
