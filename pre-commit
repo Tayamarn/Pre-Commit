@@ -14,7 +14,10 @@ diffHeader = re.compile('^@@[^\+]+\+(?P<line>\d+),(?P<offset>\d+)\s+@@')
 def isInt(s):
 	try: 
 		int(s)
-		return True
+		if float(s) == int(s):
+			return True
+		else:
+			return False
 	except ValueError:
 		return False
 
@@ -22,15 +25,20 @@ def lineIsTooLong(line, maxLength = 80):
 	"Check line's length against maximum"
 	return len(line) > maxLength
 	
-def getBashOutput(args):
+def executeProcess(args):
 	"Get bash output as an array of strings"
 	p = subprocess.Popen(args, stdout=subprocess.PIPE)
 	out, err = p.communicate()
-	return out.splitlines() if err == None else err.splitlines()
+	if err != None:
+		sys.stderr.write(err)
+		print('Error:')
+		print(err)
+		sys.exit(1)
+	return out.splitlines()
 	
 def getMaxLineLength():
 	"Get maximum line length from configuration"
-	bashOutput = getBashOutput(['git', 'config', 'pre-commit.max-line-length'])
+	bashOutput = executeProcess(['git', 'config', 'pre-commit.max-line-length'])
 	if (len(bashOutput) != 0) and (isInt(bashOutput[0]) and (bashOutput[0] > 0)):
 		return int(bashOutput[0])
 	else:
@@ -44,7 +52,7 @@ def getModifiedFiles(all_files):
 			for file_name in file_names:
 				files.append(os.path.join(root, file_name))
 	else:
-		for line in getBashOutput(['git', 'status', '--porcelain']):
+		for line in executeProcess(['git', 'status', '--porcelain']):
 			match = modified.match(line)
 			if match:
 				files.append(match.group('name'))
@@ -52,7 +60,7 @@ def getModifiedFiles(all_files):
 	
 def checkModifiedLines(file, maxLineLength):
 	"Check modified lines in the specified file and throw error if one of them is too long"
-	lines = getBashOutput(['git', 'diff', '--cached', file])
+	lines = executeProcess(['git', 'diff', '--cached', file])
 	diffLine = 0
 	for line in lines:
 			if diffHeader.match(line):
@@ -69,7 +77,7 @@ def checkModifiedLines(file, maxLineLength):
 					
 def checkLinesLength(all_files):
 	# Should we check length at all?
-	if not 'false' in getBashOutput(['git', 'config', 'pre-commit.max-line-length.enabled']):
+	if not 'false' in executeProcess(['git', 'config', 'pre-commit.max-line-length.enabled']):
 		# OK, let's get the max length of lines
 		maxLineLength = getMaxLineLength()
 		
@@ -96,16 +104,24 @@ if __name__ == '__main__':
 	main(all_files)
 	
 	
-class UnitTests(unittest.TestCase):
+class testLineLength(unittest.TestCase):
 	def testLineLength(self):
 		self.assertTrue(lineIsTooLong('a'*10,10))
 		self.assertFalse(lineIsTooLong('a'*11,10))
 		self.assertTrue(lineIsTooLong('a'*80))
 		self.assertFalse(lineIsTooLong('a'*81))
 		
+class testIfInt(unittest.TestCase):
     def testIfInt(self):
 		self.assertTrue(isInt(50))
-		self.assertFalse(isInt('ss'))
+		self.assertFalse(isInt('test'))
+		self.assertFalse(isInt(''))
+		self.assertTrue(isInt(-5))
+		self.assertFalse(isInt(1.2))
+		self.assertFalse(isInt(1,2))
+		self.assertTrue(isInt(0x4a))
+		self.assertFalse('4a')
+		
 		
 
 	
